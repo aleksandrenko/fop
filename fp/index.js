@@ -121,7 +121,6 @@ const deleteNumber = pipe(
   updateUI
 );
 
-
 function addNewNumber (collection, newNumberValue) {
   if (!newNumberValue) {
     return collection
@@ -161,7 +160,6 @@ const updateInputUI = pipe(
   preventDefaultEvent,
   (e) => {
     const newValue = state.newNumber + e.key;
-    console.log(newValue, state, e);
 
     if (e.key === 'Backspace') {
         state.newNumber = state.newNumber.slice(0, -1);
@@ -180,7 +178,6 @@ const updateInputUI = pipe(
   },
   setInputValueEffect.bind(null, '#nma-number-input')
 );
-
 
 document.addEventListener('DOMContentLoaded', () => {
   const appDomElementSelector = '#fp';
