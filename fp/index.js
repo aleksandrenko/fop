@@ -15,113 +15,184 @@ const HTML = `
   </main>
 `;
 
-const getUUID = () => {
-  var dt = new Date().getTime();
-  var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      var r = (dt + Math.random()*16)%16 | 0;
-      dt = Math.floor(dt/16);
-      return (c=='x' ? r :(r&0x3|0x8)).toString(16);
-  });
-  return uuid;
+const pipe = (...fns) => (initialValue) => {
+  return fns.reduce((value, fn) => fn(value), initialValue);
+};
+
+let uuid = 1;
+const getUUID = () => `uuid-${++uuid}`;
+
+let state = {
+  numbers: [],
+  newNumber: ''
 }
 
-const on = (domEvent) => new Promise((resolve, reject) => {
-  document.addEventListener(domEvent, resolve);
-});
+function getDataState (stateKey, state) {
+  return state[stateKey];
+}
 
-const selectDomElement = (domSelector) => () => new Promise((resolve, reject) => {
+function sumNumbers (numbers) { 
+  return numbers
+    .map(number => number.value)
+    .reduce((sum, number) => sum + number, 0)
+    .toFixed(2);
+}
+
+function updateElementHTMLEffect (domSelector, html) {
   const $element = document.querySelector(domSelector);
 
-  !$element && reject(`No dom element with selector: ${domSelector}`);
-  $element && resolve($element);
-});
+  $element 
+    ? $element.innerHTML = html
+    : console.error(`No dom element with selector: ${domSelector}`);
+}
 
-const updateInnerHTML = (html) => ($element) => new Promise((resolve, reject) => {
-  $element.innerHTML = html;
-  resolve($element);
-});
-
-const render = (numbers) => {
-  const numbersHTML = numbers
-  .map(number => `
+function createNumbersListElements (numbers) {
+  return numbers.map(number => `
     <li id=${number.id}>
       <span>${number.value.toFixed(2)}</span>
       <button id=${number.id} data-type="delete-entity-btn">delete</button>
     </li>
   `)
   .join('');
-  document.querySelector('#nma-panel-content-main-numbers').innerHTML = numbersHTML;
-
-  const sum = numbers
-    .map(number => number.value)
-    .reduce((sum, number) => sum + number, 0)
-    .toFixed(2);
-
-  document.querySelector('#nma-panel-content-main-summary').innerHTML = sum;
 }
 
-const startListeningForUserInput = ($element) => {
-  let value = '';
-  let numbers = [];
+const getNumbers = getDataState.bind(null, 'numbers');
 
-  $element.addEventListener('click', (e) => {
-    if (e.target.attributes['data-type'] && e.target.attributes['data-type'].value === 'delete-entity-btn') {
-      numbers = numbers.filter(number => number.id !== e.target.id);
+const updateSum = pipe(
+  getNumbers,
+  sumNumbers,
+  updateElementHTMLEffect.bind(null, '#nma-panel-content-main-summary')
+);
 
-      render(numbers);
-    }
+const updateNumberList = pipe(
+  getNumbers,
+  createNumbersListElements,
+  updateElementHTMLEffect.bind(null, '#nma-panel-content-main-numbers')
+);
 
-    if (e.target.id === 'nma-number-add-btn') {
-      const $input = document.querySelector('#nma-number-input');
-      const newNumberValue = parseFloat($input.value);
-
-      if (!newNumberValue) {
-        return; 
-      }
-
-      numbers.unshift({
-        id: getUUID(),
-        value: newNumberValue
-      });
-
-      //reset input value and ui
-      $input.value = '';
-      value = '';
-
-      render(numbers);
-    }
-  });
-
-  $element
-    .querySelector('#nma-number-input')
-    .addEventListener('keydown', (e) => {
-      e.preventDefault();
-      const $input = document.querySelector('#nma-number-input')
-      const newValue = value + e.key;
-
-      if (e.key === 'Backspace') {
-          value = value.slice(0, -1);
-      }
-
-      const isValid = /^\d*\.?\d*$/.test(newValue);
-
-      const canHaveDecimalParts = newValue.split('.')[1]
-          ? newValue.split('.')[1].length <= 2
-          : true;
-
-      if (isValid && canHaveDecimalParts) {
-          value = newValue;
-      }
-
-      $input.value = value;
-    });
+const updateUI = (state) => {
+  updateNumberList(state);
+  updateSum(state);
 }
 
-on('DOMContentLoaded')
-  .then(selectDomElement('#fp'))
-  .then(updateInnerHTML(HTML))
-  .then(startListeningForUserInput)
-  .catch((error) => {
-    console.error(error);
-  });
+function isDeleteItemBtn (e) {
+  return e.target.attributes['data-type'] && e.target.attributes['data-type'].value === 'delete-entity-btn';
+}
 
+function isAddButton (e) {
+  return e.target.id === 'nma-number-add-btn';
+}
+
+function filterEventTarget (filterFn, e) {
+  if (filterFn(e)) {
+    return e;
+  } else {
+    const PIPE_ERROR = new Error('Filter function stop execution.');
+    PIPE_ERROR.code = 'PIPE_ERROR';
+
+    throw PIPE_ERROR;
+  }
+}
+
+function eventTargetIdSelector (e) {
+  return e.target.id;
+}
+
+function getDataFromEvent (selectorFn, e) {
+  return selectorFn(e);
+}
+
+function filterOutNumbers (collection, idToFilterOut) {
+  return collection.filter(number => number.id !== idToFilterOut);
+}
+
+function updateStateEffect (updateFn, id) {
+  state = {
+    numbers: updateFn(state.numbers, id),
+    newNumber: ''
+  };
+  return state;
+}
+
+const deleteNumber = pipe(
+  filterEventTarget.bind(null, isDeleteItemBtn),
+  getDataFromEvent.bind(null, eventTargetIdSelector),
+  updateStateEffect.bind(null, filterOutNumbers),
+  updateUI
+);
+
+
+function addNewNumber (collection, newNumberValue) {
+  if (!newNumberValue) {
+    return collection
+  }
+
+  return [{
+    id: getUUID(),
+    value: newNumberValue
+  }].concat(collection);
+}
+
+function getInputValueEffect (selector) {
+  const $element = document.querySelector(selector);
+  return $element.value;
+}
+
+function setInputValueEffect (selector, value) {
+  const $element = document.querySelector(selector);
+  $element.value = value;
+}
+
+function preventDefaultEvent (e) {
+  e.preventDefault();
+  return e;
+}
+
+const addNumber = pipe(
+  filterEventTarget.bind(null, isAddButton),
+  getInputValueEffect.bind(null, '#nma-number-input'),
+  parseFloat,
+  updateStateEffect.bind(null, addNewNumber),
+  updateUI,
+  setInputValueEffect.bind(null, '#nma-number-input', ''),
+);
+
+const updateInputUI = pipe(
+  preventDefaultEvent,
+  (e) => {
+    const newValue = state.newNumber + e.key;
+    console.log(newValue, state, e);
+
+    if (e.key === 'Backspace') {
+        state.newNumber = state.newNumber.slice(0, -1);
+    }
+
+    const isValid = /^\d*\.?\d*$/.test(newValue);
+
+    const canHaveDecimalParts = newValue.split('.')[1]
+        ? newValue.split('.')[1].length <= 2
+        : true;
+
+    if (isValid && canHaveDecimalParts) {
+      state.newNumber = newValue;
+    }
+    return state.newNumber;
+  },
+  setInputValueEffect.bind(null, '#nma-number-input')
+);
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const appDomElementSelector = '#fp';
+  const createAppHTML = updateElementHTMLEffect.bind(null, appDomElementSelector);
+
+  createAppHTML(HTML);
+  
+  const $element = document.querySelector(appDomElementSelector);
+  const $numberInput = $element.querySelector('#nma-number-input');
+
+  $element.addEventListener('click', deleteNumber);
+  $element.addEventListener('click', addNumber);
+
+  $numberInput.addEventListener('keydown', updateInputUI);
+});
