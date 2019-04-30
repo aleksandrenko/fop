@@ -32,22 +32,28 @@ class Adder {
     }
 
     getSum = () => {
-        return this.entries
-            .map(entry => entry.value)
-            .reduce((sum, number) => sum + number, 0)
-            .toFixed(2);
+        let sum = 0;
+
+        for (let i = 0; this.entries.length > i; i++) {
+            sum += this.entries[i].value;
+        }
+
+        return sum.toFixed(2);
     }
 
-    getHTML = () => { 
-        const numbers = this.entries
-            .map(entity =>`
+    getHTML = () => {
+        let numbers = '';
+        
+        for (let i = 0; this.entries.length > i; i++) {
+            let entity = this.entries[i];
+            numbers += `
                 <li>
                     <span>${entity.value.toFixed(2)}</span>
                     <button data-uuid=${entity.id} data-type="delete-entity-btn">delete</button>
                 </li>
-            `)
-            .join('');
-
+            `
+        }
+        
         // Its always rerendering the whole html. Can be optimized.
         return `
             <main class="nma-panel">
@@ -82,7 +88,13 @@ class Adder {
     }
 
     removeNumber = (id) => {
-        this.entries = this.entries.filter((entity) => entity.id !== id);
+        for(let i = 0; this.entries.length > i; i++) {
+            let entity = this.entries[i];
+
+            if (entity.id === id) {
+                this.entries.splice(i, 1);
+            }
+        };
         this.render();
     }
 }
