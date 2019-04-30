@@ -180,16 +180,20 @@ const updateInputUI = pipe(
 );
 
 document.addEventListener('DOMContentLoaded', () => {
-  const appDomElementSelector = '#fp';
-  const createAppHTML = updateElementHTMLEffect.bind(null, appDomElementSelector);
+  try {
+    const appDomElementSelector = '#fp';
+    const createAppHTML = updateElementHTMLEffect.bind(null, appDomElementSelector);
 
-  createAppHTML(HTML);
-  
-  const $element = document.querySelector(appDomElementSelector);
-  const $numberInput = $element.querySelector('#nma-number-input');
+    createAppHTML(HTML);
+    
+    const $element = document.querySelector(appDomElementSelector);
+    const $numberInput = $element.querySelector('#nma-number-input');
 
-  $element.addEventListener('click', deleteNumber);
-  $element.addEventListener('click', addNumber);
+    $element.addEventListener('click', deleteNumber);
+    $element.addEventListener('click', addNumber);
 
-  $numberInput.addEventListener('keydown', updateInputUI);
+    $numberInput.addEventListener('keydown', updateInputUI);
+  } catch (err) {
+    console.log(err);
+  } 
 });
